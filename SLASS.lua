@@ -8,15 +8,6 @@
         local RunService = game:GetService("RunService")
         local TweenService = game:GetService("TweenService")
         local bv, bg, flyConnection
-        
-        -- 🔥 SETUP REMOTE EVENT CHO INVISIBILITY
-        local ReplicatedStorage = game:GetService("ReplicatedStorage")
-        local invisibilityRemote = ReplicatedStorage:FindFirstChild("InvisibilityToggle")
-        if not invisibilityRemote then
-            invisibilityRemote = Instance.new("RemoteEvent")
-            invisibilityRemote.Name = "InvisibilityToggle"
-            invisibilityRemote.Parent = ReplicatedStorage
-        end
         local localHumanoid
         local speedOn = _G.speedOn or false
         _G.immortalConnection = _G.immortalConnection or nil
@@ -29,99 +20,16 @@
         local tracerOn = _G.tracerOn or false
         local rejoin1On = _G.rejoin1On or false
         local autoAttackOn = _G.autoAttackOn or false
-        local autoAttackRange = _G.autoAttackRange or 30
+        local autoAttackRange = _G.autoAttackRange or 100
         local lastAttackTime = 0
         local attackCooldown = _G.attackCooldown or 0.2  -- Delay giữa các attack (0.2s để tránh lag)
-        local tradeSafeOn = _G.tradeSafeOn or false  -- Anti-knockdown khi buôn vũ khí
-        local tradeSafeConnection = nil
         local autoKillModOn = _G.autoKillModOn or false  -- Auto Kill Mobs
         local autoKillModRange = _G.autoKillModRange or 50  -- Detection range for mobs
         local lastModAttackTime = 0
         local modAttackCooldown = _G.modAttackCooldown or 0.15  -- Attack cooldown for mobs
         local autoKillModConnection = nil
-        local auraKillOn = _G.auraKillOn or false  -- Aura Kill
-        local auraKillRange = _G.auraKillRange or 20
-        local auraKillSpeed = _G.auraKillSpeed or 0.1
-        local lastAuraAttackTime = 0
-        local auraKillConnection = nil
-        local invisibilityOn = _G.invisibilityOn or false  -- Invisibility
         local dupeMoneyOn = _G.dupeMoneyOn or false  -- Auto Dupe Money
         local dupeAmount = _G.dupeAmount or 1000  -- 1k money per click
-
-        local function applyInvisibility(char, isInvisible)
-            if not char then return end
-            local hum = char:FindFirstChild("Humanoid")
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            
-            if not hrp then return end
-            
-            if isInvisible then
-                -- Tàng hình tất cả body parts (trừ HRP để chém được)
-                for _, part in pairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") and part ~= hrp then
-                        if not part:GetAttribute("OriginalTransparency") then
-                            part:SetAttribute("OriginalTransparency", part.Transparency)
-                        end
-                        part.Transparency = 1
-                    end
-                end
-                
-                -- Tàng hình thanh máu nhân vật
-                if hum then
-                    if not hum:GetAttribute("OriginalHealthDisplayDistance") then
-                        hum:SetAttribute("OriginalHealthDisplayDistance", hum.HealthDisplayDistance)
-                    end
-                    hum.HealthDisplayDistance = 0  -- Tàng hình thanh máu
-                end
-                
-                -- 🔥 ĐẶT THUỘC TÍNH ĐỂ BROADCAST TỚI TẤT CẢ CLIENTS
-                char:SetAttribute("IsInvisible", true)
-                
-                -- 🔥 GỬI SIGNAL TỚI SERVER
-                pcall(function()
-                    invisibilityRemote:FireServer(player.UserId, true)
-                end)
-            else
-                -- Khôi phục transparency tất cả parts
-                for _, part in pairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        local origTransparency = part:GetAttribute("OriginalTransparency")
-                        if origTransparency ~= nil then
-                            part.Transparency = origTransparency
-                        end
-                    end
-                end
-                
-                -- Khôi phục health display
-                if hum then
-                    -- Khôi phục HealthDisplayDistance
-                    local origHealthDisplayDistance = hum:GetAttribute("OriginalHealthDisplayDistance")
-                    if origHealthDisplayDistance then
-                        hum.HealthDisplayDistance = origHealthDisplayDistance
-                    else
-                        hum.HealthDisplayDistance = 100  -- Default nếu không lưu được
-                    end
-                end
-                
-                -- Xóa attributes
-                for _, part in pairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part:SetAttribute("OriginalTransparency", nil)
-                    end
-                end
-                if hum then
-                    hum:SetAttribute("OriginalHealthDisplayDistance", nil)
-                end
-                
-                -- 🔥 RESET THUỘC TÍNH BẬT TÀNG HÌNH
-                char:SetAttribute("IsInvisible", false)
-                
-                -- 🔥 GỬI SIGNAL TỚI SERVER
-                pcall(function()
-                    invisibilityRemote:FireServer(player.UserId, false)
-                end)
-            end
-        end
 
         local function updateHumanoidState()
             if not localHumanoid then return end
@@ -185,7 +93,7 @@
 
                 -- Teleport on top of enemy head (small offset)
                 local targetPos = targetHRP.Position
-                local onHeadPos = targetPos + Vector3.new(0, 6.5, 0) -- 6.5 studs above head
+                local onHeadPos = targetPos + Vector3.new(0, 5.5, 0) -- 5.5 studs above head
                 myHRP.CFrame = CFrame.new(onHeadPos, targetPos) -- Look down at enemy
 
                 -- Freeze player in place - không bị bay
@@ -256,40 +164,6 @@
             if autoAttackConnection then
                 autoAttackConnection:Disconnect()
                 autoAttackConnection = nil
-            end
-        end
-
-        local function startTradeSafe()
-            if tradeSafeConnection then tradeSafeConnection:Disconnect() end
-            tradeSafeConnection = RunService.Heartbeat:Connect(function()
-                if not tradeSafeOn then
-                    if tradeSafeConnection then tradeSafeConnection:Disconnect() end
-                    return
-                end
-                
-                local char = player.Character
-                if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-                
-                local hum = char:FindFirstChild("Humanoid")
-                if hum then
-                    hum.PlatformStand = true
-                    char.HumanoidRootPart.Velocity = Vector3.new(0, 0, 0)
-                    char.HumanoidRootPart.RotVelocity = Vector3.new(0, 0, 0)
-                end
-            end)
-        end
-
-        local function stopTradeSafe()
-            if tradeSafeConnection then
-                tradeSafeConnection:Disconnect()
-                tradeSafeConnection = nil
-            end
-            local char = player.Character
-            if char then
-                local hum = char:FindFirstChild("Humanoid")
-                if hum then
-                    hum.PlatformStand = false
-                end
             end
         end
 
@@ -525,102 +399,6 @@
         -- =========================
 
         -- =========================
-        -- AURA KILL FUNCTIONS
-        -- =========================
-
-        local function updateAuraKill()
-            if not auraKillOn then return end
-
-            local currentTime = tick()
-            if currentTime - lastAuraAttackTime < auraKillSpeed then return end
-
-            local char = player.Character
-            if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-
-            local tool = char:FindFirstChildOfClass("Tool")
-            if not tool then 
-                print("[Aura Kill] No tool equipped!")
-                return 
-            end
-
-            local myHRP = char.HumanoidRootPart
-            local myPos = myHRP.Position
-            local hum = char:FindFirstChild("Humanoid")
-            if not hum then return end
-
-            local targetCount = 0
-
-            -- Find all players in aura range and deal damage
-            for _, otherPlayer in pairs(game.Players:GetPlayers()) do
-                if otherPlayer ~= player and otherPlayer.Character then
-                    local otherChar = otherPlayer.Character
-                    if otherChar:FindFirstChild("HumanoidRootPart") and otherChar:FindFirstChild("Humanoid") then
-                        if otherChar.Humanoid.Health > 0 then
-                            local distance = (myPos - otherChar.HumanoidRootPart.Position).Magnitude
-                            if distance <= auraKillRange then
-                                targetCount = targetCount + 1
-                                print("[Aura Kill] Target: " .. otherPlayer.Name .. " at distance: " .. math.floor(distance) .. " studs")
-                                
-                                -- Deal damage directly to the humanoid (50 damage per tick)
-                                otherChar.Humanoid:TakeDamage(50)
-                                
-                                -- Try to invoke weapon hit methods
-                                pcall(function()
-                                    if tool:FindFirstChild("Hit") then
-                                        print("[Aura Kill] Found Hit RemoteEvent!")
-                                        tool.Hit:FireServer(otherChar.Humanoid)
-                                    end
-                                end)
-                                
-                                -- Try RemoteEvent from tool
-                                pcall(function()
-                                    for _, obj in pairs(tool:GetChildren()) do
-                                        if obj:IsA("RemoteEvent") then
-                                            if obj.Name:lower():find("hit") or obj.Name:lower():find("damage") or obj.Name:lower():find("attack") then
-                                                print("[Aura Kill] Firing RemoteEvent: " .. obj.Name)
-                                                obj:FireServer(otherChar.Humanoid)
-                                            end
-                                        end
-                                    end
-                                end)
-                                
-                                -- Try RemoteFunction
-                                pcall(function()
-                                    for _, obj in pairs(tool:GetChildren()) do
-                                        if obj:IsA("RemoteFunction") then
-                                            if obj.Name:lower():find("hit") or obj.Name:lower():find("damage") or obj.Name:lower():find("attack") then
-                                                print("[Aura Kill] Invoking RemoteFunction: " .. obj.Name)
-                                                obj:InvokeServer(otherChar.Humanoid)
-                                            end
-                                        end
-                                    end
-                                end)
-                            end
-                        end
-                    end
-                end
-            end
-
-            if targetCount > 0 then
-                print("[Aura Kill] Damaged " .. targetCount .. " target(s)")
-            end
-
-            lastAuraAttackTime = currentTime
-        end
-
-        local function startAuraKill()
-            if auraKillConnection then auraKillConnection:Disconnect() end
-            auraKillConnection = RunService.Heartbeat:Connect(updateAuraKill)
-        end
-
-        local function stopAuraKill()
-            if auraKillConnection then
-                auraKillConnection:Disconnect()
-                auraKillConnection = nil
-            end
-        end
-
-        -- =========================
         -- FIX KHI CHẾT / RESPAWN
         -- =========================
         local function applyFly(char)
@@ -686,18 +464,12 @@
                 flyOn = _G.flyOn or false
                 nonclipOn = _G.nonclipOn or false
                 autoAttackOn = _G.autoAttackOn or false
-                tradeSafeOn = _G.tradeSafeOn or false
                 autoKillModOn = _G.autoKillModOn or false
-                auraKillOn = _G.auraKillOn or false
-                invisibilityOn = _G.invisibilityOn or false
                 speedValue = _G.speedValue or 16
                 jumpValue = _G.jumpValue or 50
                 flySpeed = _G.flySpeed or 60
                 attackCooldown = _G.attackCooldown or 0.2
                 modAttackCooldown = _G.modAttackCooldown or 0.15
-                auraKillRange = _G.auraKillRange or 20
-                auraKillSpeed = _G.auraKillSpeed or 0.1
-                invisibilityOn = _G.invisibilityOn or false
 
                 -- áp dụng giá trị từ toggle
                 updateHumanoidState()
@@ -713,16 +485,8 @@
                     startAutoAttack()
                 end
 
-                if tradeSafeOn then
-                    startTradeSafe()
-                end
-
                 if autoKillModOn then
                     startAutoKillMod()
-                end
-
-                if auraKillOn then
-                    startAuraKill()
                 end
 
                 if nonclipOn then
@@ -733,20 +497,7 @@
                     end
                 end
 
-                if invisibilityOn then
-                    -- Chỉ apply invisibility nếu chưa apply
-                    if not char:GetAttribute("InvisibilityApplied") then
-                        applyInvisibility(char, true)
-                        char:SetAttribute("InvisibilityApplied", true)
-                    end
-                else
-                    -- Khôi phục nếu đang bật invisibility
-                    if char:GetAttribute("InvisibilityApplied") then
-                        applyInvisibility(char, false)
-                        char:SetAttribute("InvisibilityApplied", false)
-                    end
-                end
-
+                
                 -- Update UI buttons nếu chúng tồn tại
                 if localPlayerFrame and localPlayerFrame.Parent then
                     local speedBtn = localPlayerFrame:FindFirstChild("SpeedBtn")
@@ -778,75 +529,25 @@
         gui.ResetOnSpawn = false
         gui.Parent = player:WaitForChild("PlayerGui")
 
-        -- 🔥 PHÁT HIỆN MOBILE
-        local isMobile = game:GetService("UserInputService").TouchEnabled
-        local screenSize = gui.AbsoluteSize
-        
-        -- Tính toán kích thước khung phù hợp với màn hình
-        local frameWidth = math.max(math.min(screenSize.X * 0.8, 600), 250)
-        local frameHeight = math.max(math.min(screenSize.Y * 0.8, 500), 300)
-        
-        -- Trên mobile, làm nhỏ hơn
-        if isMobile then
-            frameWidth = math.min(frameWidth, 400)
-            frameHeight = math.min(frameHeight, 400)
-        end
-
         -- 🔥 ICON BUTTON
         local toggleBtn = Instance.new("ImageButton")
-        toggleBtn.Size = UDim2.new(0, 50, 0, 50)
-        toggleBtn.Position = UDim2.new(0, 10, 0, 10)  -- Di chuyển lên góc trên cùng để dễ truy cập
+        toggleBtn.Size = UDim2.new(0, 60, 0, 60)
+        toggleBtn.Position = UDim2.new(0.5, -30, 0.1, -30)
         toggleBtn.BackgroundColor3 = Color3.fromRGB(30,30,30)
         toggleBtn.Image = "rbxassetid://72810918956594"
         toggleBtn.Parent = gui
+        toggleBtn.ZIndex = 10
         toggleBtn.Active = true
         Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1,0)
 
-        -- MAIN FRAME - Responsive
+        -- MAIN FRAME
         local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, frameWidth, 0, frameHeight)
-        -- Đặt vị trí ban đầu ở góc trên bên phải (không che phủ icon button)
-        frame.Position = UDim2.new(1, -frameWidth - 10, 0, 10)
+        frame.Size = UDim2.new(0, 600, 0, 500)
+        frame.Position = UDim2.new(0.5, -300, 0.5, -250)
         frame.BackgroundColor3 = Color3.fromRGB(0,0,0)
         frame.Parent = gui
         frame.Active = true
         Instance.new("UICorner", frame)
-
-        -- 🔥 RESPONSIVE HANDLER - Điều chỉnh kích thước khi màn hình thay đổi
-        local function updateFrameSize()
-            local newScreenSize = gui.AbsoluteSize
-            local newFrameWidth = math.max(math.min(newScreenSize.X * 0.8, 600), 250)
-            local newFrameHeight = math.max(math.min(newScreenSize.Y * 0.8, 500), 300)
-            
-            if isMobile then
-                newFrameWidth = math.min(newFrameWidth, 400)
-                newFrameHeight = math.min(newFrameHeight, 400)
-            end
-            
-            frameWidth = newFrameWidth
-            frameHeight = newFrameHeight
-            
-            -- Cập nhật vị trí để frame không ra ngoài màn hình
-            if not minimized then
-                frame.Size = UDim2.new(0, frameWidth, 0, frameHeight)
-            else
-                frame.Size = UDim2.new(0, frameWidth, 0, 40)
-            end
-            
-            -- Đảm bảo frame vẫn nằm trong màn hình
-            if frame.Position.X.Offset + frame.AbsoluteSize.X > newScreenSize.X then
-                frame.Position = UDim2.new(1, -frameWidth - 10, frame.Position.Y.Scale, frame.Position.Y.Offset)
-            end
-            
-            if frame.Position.Y.Offset + frame.AbsoluteSize.Y > newScreenSize.Y then
-                frame.Position = UDim2.new(frame.Position.X.Scale, frame.Position.X.Offset, 0, newScreenSize.Y - frame.AbsoluteSize.Y - 10)
-            end
-        end
-        
-        -- Gọi khi màn hình thay đổi kích thước
-        gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateFrameSize)
-        
-        local minimized = false
 
         -- TITLE BAR
         local titleBar = Instance.new("Frame")
@@ -896,84 +597,6 @@
         contentFrame.Position = UDim2.new(0,150,0,40)
         contentFrame.BackgroundTransparency = 1
         contentFrame.Parent = frame
-
-        -- =========================
-        -- RESIZE HANDLE (Kéo để phóng to/thu nhỏ)
-        -- =========================
-        local resizeHandle = Instance.new("Frame")
-        resizeHandle.Name = "ResizeHandle"
-        resizeHandle.Size = UDim2.new(0, 20, 0, 20)
-        resizeHandle.Position = UDim2.new(1, -20, 1, -20)
-        resizeHandle.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-        resizeHandle.BorderSizePixel = 0
-        resizeHandle.Parent = frame
-        resizeHandle.Active = true
-        
-        -- Tạo góc tam giác để hiển thị
-        local corner = Instance.new("UICorner", resizeHandle)
-        corner.CornerRadius = UDim.new(0, 4)
-        
-        -- Label cho resize handle
-        local resizeLabel = Instance.new("TextLabel")
-        resizeLabel.Text = "⬈"
-        resizeLabel.Size = UDim2.new(1, 0, 1, 0)
-        resizeLabel.BackgroundTransparency = 1
-        resizeLabel.TextColor3 = Color3.new(1, 1, 1)
-        resizeLabel.TextSize = 14
-        resizeLabel.Parent = resizeHandle
-
-        -- =========================
-        -- RESIZE FUNCTIONALITY
-        -- =========================
-        local resizing = false
-        local resizeStart
-        local startSize
-        local MIN_WIDTH = 200
-        local MIN_HEIGHT = 150
-        local MAX_WIDTH = 1000
-        local MAX_HEIGHT = 800
-
-        resizeHandle.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                resizing = true
-                resizeStart = input.Position
-                startSize = {
-                    width = frame.AbsoluteSize.X,
-                    height = frame.AbsoluteSize.Y
-                }
-            end
-        end)
-
-        UIS.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                resizing = false
-            end
-        end)
-
-        UIS.InputChanged:Connect(function(input)
-            if resizing and input.UserInputType == Enum.UserInputType.MouseMovement then
-                local delta = input.Position - resizeStart
-                
-                local newWidth = math.max(MIN_WIDTH, math.min(startSize.width + delta.X, MAX_WIDTH))
-                local newHeight = math.max(MIN_HEIGHT, math.min(startSize.height + delta.Y, MAX_HEIGHT))
-                
-                -- Cập nhật chiều rộng khung chính
-                frame.Size = UDim2.new(0, newWidth, 0, newHeight)
-                
-                -- Cập nhật chiều rộng menu dựa trên tỷ lệ
-                local menuWidth = math.floor(newWidth * 0.25)
-                if menuWidth < 100 then menuWidth = 100 end
-                menu.Size = UDim2.new(0, menuWidth, 1, -40)
-                
-                -- Cập nhật chiều rộng contentFrame
-                contentFrame.Size = UDim2.new(1, -menuWidth, 1, -40)
-                contentFrame.Position = UDim2.new(0, menuWidth, 0, 40)
-                
-                -- Cập nhật frameWidth và frameHeight để ghi nhớ
-                frameWidth = newWidth
-                frameHeight = newHeight
-            end
-        end)
 
         -- =========================
         -- DỮ LIỆU NÚT RIÊNG CHO TAB
@@ -1150,7 +773,7 @@
         -- =========================
         -- MENU BUTTONS
         -- =========================
-        local items = {"Local Player","Auto Farm","PVP","ITEM","Auto Rejoin"}
+        local items = {"Local Player","Auto Farm","PVP","Auto Rejoin"}
 
         for i,v in ipairs(items) do
             local btn = Instance.new("TextButton")
@@ -1208,11 +831,11 @@
             end)
 
             speedBar.InputBegan:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingSpeed = true end
+                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then draggingSpeed = true end
             end)
 
             UIS.InputEnded:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingSpeed = false end
+                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then draggingSpeed = false end
             end)
 
             UIS.InputChanged:Connect(function(i)
@@ -1251,11 +874,11 @@
             end)
 
             jumpBar.InputBegan:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingJump = true end
+                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then draggingJump = true end
             end)
 
             UIS.InputEnded:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingJump = false end
+                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then draggingJump = false end
             end)
 
             UIS.InputChanged:Connect(function(i)
@@ -1299,11 +922,11 @@
         end)
 
         flyBar.InputBegan:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingFly = true end
+            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then draggingFly = true end
         end)
 
         UIS.InputEnded:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingFly = false end
+            if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then draggingFly = false end
         end)
 
         UIS.InputChanged:Connect(function(i)
@@ -1333,30 +956,6 @@
                 if part:IsA("BasePart") then
                     part.CanCollide = not nonclipOn
                 end
-            end
-        end)
-
-        -- =========================
-        -- INVISIBILITY BUTTON
-        -- =========================
-        local invisibilityBtn = Instance.new("TextButton", uiParent)
-        invisibilityBtn.Size = UDim2.new(0,200,0,40)
-        invisibilityBtn.Position = UDim2.new(0,20,0,300)
-        invisibilityBtn.Text = "Invisibility: " .. (invisibilityOn and "ON" or "OFF")
-        invisibilityBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
-        invisibilityBtn.TextColor3 = Color3.new(1,1,1)
-
-        invisibilityBtn.MouseButton1Click:Connect(function()
-            invisibilityOn = not invisibilityOn
-            _G.invisibilityOn = invisibilityOn
-            invisibilityBtn.Text = "Invisibility: " .. (invisibilityOn and "ON" or "OFF")
-            
-            -- Áp dụng invisibility ngay lập tức
-            local char = player.Character
-            if char then
-                applyInvisibility(char, invisibilityOn)
-                char:SetAttribute("InvisibilityApplied", invisibilityOn and true or false)
-                char:SetAttribute("IsInvisible", invisibilityOn)
             end
         end)
 
@@ -1424,11 +1023,11 @@
             local draggingModRange = false
 
             modRangeBar.InputBegan:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingModRange = true end
+                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then draggingModRange = true end
             end)
 
             UIS.InputEnded:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingModRange = false end
+                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then draggingModRange = false end
             end)
 
             UIS.InputChanged:Connect(function(i)
@@ -1463,11 +1062,11 @@
             local draggingModSpeed = false
 
             modSpeedBar.InputBegan:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingModSpeed = true end
+                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then draggingModSpeed = true end
             end)
 
             UIS.InputEnded:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingModSpeed = false end
+                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then draggingModSpeed = false end
             end)
 
             UIS.InputChanged:Connect(function(i)
@@ -1533,11 +1132,11 @@
             local draggingDupeAmount = false
 
             dupeAmountBar.InputBegan:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingDupeAmount = true end
+                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then draggingDupeAmount = true end
             end)
 
             UIS.InputEnded:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingDupeAmount = false end
+                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then draggingDupeAmount = false end
             end)
 
             UIS.InputChanged:Connect(function(i)
@@ -1711,11 +1310,11 @@
             local draggingRange = false
 
             rangeBar.InputBegan:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingRange = true end
+                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then draggingRange = true end
             end)
 
             UIS.InputEnded:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingRange = false end
+                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then draggingRange = false end
             end)
 
             UIS.InputChanged:Connect(function(i)
@@ -1750,11 +1349,11 @@
             local draggingSpeed = false
 
             speedBar.InputBegan:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingSpeed = true end
+                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then draggingSpeed = true end
             end)
 
             UIS.InputEnded:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingSpeed = false end
+                if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then draggingSpeed = false end
             end)
 
             UIS.InputChanged:Connect(function(i)
@@ -1795,126 +1394,14 @@
                 end
             end)
 
-            -- TRADE SAFE BUTTON (Anti-Knockdown)
-            local tradeSafeBtn = Instance.new("TextButton", uiParent)
-            tradeSafeBtn.Size = UDim2.new(0,200,0,40)
-            tradeSafeBtn.Position = UDim2.new(0,20,0,195)
-            tradeSafeBtn.Text = "Trade Safe: " .. (tradeSafeOn and "ON" or "OFF")
-            tradeSafeBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
-            tradeSafeBtn.TextColor3 = Color3.new(1,1,1)
 
-            tradeSafeBtn.MouseButton1Click:Connect(function()
-                tradeSafeOn = not tradeSafeOn
-                _G.tradeSafeOn = tradeSafeOn
-                tradeSafeBtn.Text = "Trade Safe: " .. (tradeSafeOn and "ON" or "OFF")
-                if tradeSafeOn then
-                    startTradeSafe()
-                else
-                    stopTradeSafe()
-                end
-            end)
 
-            -- AURA KILL BUTTON
-            local auraKillBtn = Instance.new("TextButton", uiParent)
-            auraKillBtn.Size = UDim2.new(0,200,0,40)
-            auraKillBtn.Position = UDim2.new(0,20,0,240)
-            auraKillBtn.Text = "Aura Kill: " .. (auraKillOn and "ON" or "OFF")
-            auraKillBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
-            auraKillBtn.TextColor3 = Color3.new(1,1,1)
 
-            auraKillBtn.MouseButton1Click:Connect(function()
-                auraKillOn = not auraKillOn
-                _G.auraKillOn = auraKillOn
-                auraKillBtn.Text = "Aura Kill: " .. (auraKillOn and "ON" or "OFF")
-                if auraKillOn then
-                    startAuraKill()
-                else
-                    stopAuraKill()
-                end
-            end)
-
-            -- AURA KILL RANGE SLIDER
-            local auraRangeLabel = Instance.new("TextLabel", uiParent)
-            auraRangeLabel.Size = UDim2.new(0,200,0,20)
-            auraRangeLabel.Position = UDim2.new(0,20,0,285)
-            auraRangeLabel.Text = "Aura Range: " .. auraKillRange
-            auraRangeLabel.BackgroundTransparency = 1
-            auraRangeLabel.TextColor3 = Color3.new(1,1,1)
-            auraRangeLabel.TextScaled = false
-            auraRangeLabel.TextSize = 16
-
-            local auraRangeBar = Instance.new("Frame", uiParent)
-            auraRangeBar.Size = UDim2.new(0,300,0,10)
-            auraRangeBar.Position = UDim2.new(0,20,0,310)
-            auraRangeBar.BackgroundColor3 = Color3.fromRGB(80,80,80)
-
-            local auraRangeFill = Instance.new("Frame", auraRangeBar)
-            auraRangeFill.Size = UDim2.new(math.clamp((auraKillRange - 1) / 99, 0, 1), 0, 1, 0)
-            auraRangeFill.BackgroundColor3 = Color3.fromRGB(200,100,255)
-
-            local draggingAuraRange = false
-
-            auraRangeBar.InputBegan:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingAuraRange = true end
-            end)
-
-            UIS.InputEnded:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingAuraRange = false end
-            end)
-
-            UIS.InputChanged:Connect(function(i)
-                if draggingAuraRange then
-                    local pos = math.clamp((i.Position.X - auraRangeBar.AbsolutePosition.X)/auraRangeBar.AbsoluteSize.X,0,1)
-                    auraRangeFill.Size = UDim2.new(pos,0,1,0)
-                    auraKillRange = math.floor(1 + pos*99)
-                    _G.auraKillRange = auraKillRange
-                    auraRangeLabel.Text = "Aura Range: " .. auraKillRange
-                end
-            end)
-
-            -- AURA KILL SPEED SLIDER
-            local auraSpeedLabel = Instance.new("TextLabel", uiParent)
-            auraSpeedLabel.Size = UDim2.new(0,200,0,20)
-            auraSpeedLabel.Position = UDim2.new(0,20,0,325)
-            auraSpeedLabel.Text = "Aura Speed: " .. string.format("%.2f", auraKillSpeed)
-            auraSpeedLabel.BackgroundTransparency = 1
-            auraSpeedLabel.TextColor3 = Color3.new(1,1,1)
-            auraSpeedLabel.TextScaled = false
-            auraSpeedLabel.TextSize = 16
-
-            local auraSpeedBar = Instance.new("Frame", uiParent)
-            auraSpeedBar.Size = UDim2.new(0,300,0,10)
-            auraSpeedBar.Position = UDim2.new(0,20,0,350)
-            auraSpeedBar.BackgroundColor3 = Color3.fromRGB(80,80,80)
-
-            local auraSpeedFill = Instance.new("Frame", auraSpeedBar)
-            auraSpeedFill.Size = UDim2.new(math.clamp((0.2 - auraKillSpeed) / 0.15, 0, 1), 0, 1, 0)
-            auraSpeedFill.BackgroundColor3 = Color3.fromRGB(255,100,150)
-
-            local draggingAuraSpeed = false
-
-            auraSpeedBar.InputBegan:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingAuraSpeed = true end
-            end)
-
-            UIS.InputEnded:Connect(function(i)
-                if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingAuraSpeed = false end
-            end)
-
-            UIS.InputChanged:Connect(function(i)
-                if draggingAuraSpeed then
-                    local pos = math.clamp((i.Position.X - auraSpeedBar.AbsolutePosition.X)/auraSpeedBar.AbsoluteSize.X,0,1)
-                    auraSpeedFill.Size = UDim2.new(pos,0,1,0)
-                    auraKillSpeed = math.max(0.05, 0.2 - pos * 0.15)
-                    _G.auraKillSpeed = auraKillSpeed
-                    auraSpeedLabel.Text = "Aura Speed: " .. string.format("%.2f", auraKillSpeed)
-                end
-            end)
 
             -- TELEPORT SECTION
             local teleportLabel = Instance.new("TextLabel", uiParent)
             teleportLabel.Size = UDim2.new(0,200,0,30)
-            teleportLabel.Position = UDim2.new(0,20,0,365)
+            teleportLabel.Position = UDim2.new(0,20,0,250)
             teleportLabel.Text = "Teleport to Player"
             teleportLabel.BackgroundTransparency = 1
             teleportLabel.TextColor3 = Color3.new(1,1,1)
@@ -1922,7 +1409,7 @@
 
             local playerList = Instance.new("ScrollingFrame", uiParent)
             playerList.Size = UDim2.new(0,300,0,120)
-            playerList.Position = UDim2.new(0,20,0,395)
+            playerList.Position = UDim2.new(0,20,0,280)
             playerList.BackgroundColor3 = Color3.fromRGB(20,20,20)
             playerList.CanvasSize = UDim2.new(0,0,0,0)
             playerList.ScrollBarThickness = 10
@@ -2185,10 +1672,6 @@
                 autoAttackConnection:Disconnect()
             end
             
-            if tradeSafeConnection then
-                tradeSafeConnection:Disconnect()
-            end
-            
             if autoKillModConnection then
                 autoKillModConnection:Disconnect()
             end
@@ -2213,16 +1696,11 @@
             _G.nonclipOn = false
             _G.tracerOn = false
             _G.autoAttackOn = false
-            _G.autoAttackRange = 30
+            _G.autoAttackRange = 100
             _G.attackCooldown = 0.2
-            _G.tradeSafeOn = false
             _G.autoKillModOn = false
             _G.autoKillModRange = 50
             _G.modAttackCooldown = 0.15
-            _G.auraKillOn = false
-            _G.auraKillRange = 20
-            _G.auraKillSpeed = 0.1
-            _G.invisibilityOn = false
             _G.rejoin1On = false
             if _G.RejoinConnection then _G.RejoinConnection:Disconnect() end
 
@@ -2230,14 +1708,15 @@
         end)
 
         -- MINIMIZE
+        local minimized = false
         minimize.MouseButton1Click:Connect(function()
             minimized = not minimized
             if minimized then
-                frame.Size = UDim2.new(0, frameWidth, 0, 40)
+                frame.Size = UDim2.new(0,600,0,40)
                 menu.Visible = false
                 contentFrame.Visible = false
             else
-                frame.Size = UDim2.new(0, frameWidth, 0, frameHeight)
+                frame.Size = UDim2.new(0,600,0,500)
                 menu.Visible = true
                 contentFrame.Visible = true
             end
@@ -2281,7 +1760,7 @@
 
         -- Bắt đầu kéo
         toggleBtn.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 draggingBtn = true
                 dragStartBtn = input.Position
                 startPosBtn = toggleBtn.Position
@@ -2290,14 +1769,14 @@
 
         -- Thả chuột = dừng kéo
         UIS.InputEnded:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                 draggingBtn = false
             end
         end)
 
         -- Kéo mượt
         UIS.InputChanged:Connect(function(input)
-            if draggingBtn and input.UserInputType == Enum.UserInputType.MouseMovement then
+            if draggingBtn and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
                 local delta = input.Position - dragStartBtn
                 toggleBtn.Position = UDim2.new(
                     startPosBtn.X.Scale,
