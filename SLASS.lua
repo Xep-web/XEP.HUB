@@ -531,8 +531,8 @@
 
         -- 🔥 ICON BUTTON
         local toggleBtn = Instance.new("ImageButton")
-        toggleBtn.Size = UDim2.new(0, 60, 0, 60)
-        toggleBtn.Position = UDim2.new(0.5, -30, 0.1, -30)
+        toggleBtn.Size = UDim2.new(0, 48, 0, 48)
+        toggleBtn.Position = UDim2.new(0.5, -24, 0.1, -24)
         toggleBtn.BackgroundColor3 = Color3.fromRGB(30,30,30)
         toggleBtn.Image = "rbxassetid://72810918956594"
         toggleBtn.Parent = gui
@@ -540,10 +540,15 @@
         toggleBtn.Active = true
         Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1,0)
 
-        -- MAIN FRAME
+        -- MAIN FRAME (SMALLER FOR MOBILE)
         local frame = Instance.new("Frame")
-        frame.Size = UDim2.new(0, 600, 0, 500)
-        frame.Position = UDim2.new(0.5, -300, 0.5, -250)
+        local screenW = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize.X or 1280
+        local screenH = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize.Y or 720
+        local targetW = math.clamp(360, 220, screenW - 40)
+        local targetH = math.clamp(300, 240, screenH - 80)
+
+        frame.Size = UDim2.new(0, targetW, 0, targetH)
+        frame.Position = UDim2.new(0.5, -targetW/2, 0.5, -targetH/2)
         frame.BackgroundColor3 = Color3.fromRGB(0,0,0)
         frame.Parent = gui
         frame.Active = true
@@ -551,7 +556,7 @@
 
         -- TITLE BAR
         local titleBar = Instance.new("Frame")
-        titleBar.Size = UDim2.new(1,0,0,40)
+        titleBar.Size = UDim2.new(1,0,0,28)
         titleBar.BackgroundColor3 = Color3.fromRGB(20,20,20)
         titleBar.Parent = frame
         titleBar.Active = true
@@ -586,15 +591,15 @@
 
         -- MENU
         local menu = Instance.new("Frame")
-        menu.Size = UDim2.new(0,150,1,-40)
-        menu.Position = UDim2.new(0,0,0,40)
+        menu.Size = UDim2.new(0,100,1,-34)
+        menu.Position = UDim2.new(0,0,0,28)
         menu.BackgroundColor3 = Color3.fromRGB(15,15,15)
         menu.Parent = frame
 
         -- CONTENT FRAME
         local contentFrame = Instance.new("Frame")
-        contentFrame.Size = UDim2.new(1,-150,1,-40)
-        contentFrame.Position = UDim2.new(0,150,0,40)
+        contentFrame.Size = UDim2.new(1,-100,1,-34)
+        contentFrame.Position = UDim2.new(0,100,0,28)
         contentFrame.BackgroundTransparency = 1
         contentFrame.Parent = frame
 
